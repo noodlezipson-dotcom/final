@@ -1,8 +1,5 @@
 import streamlit as st
 import pandas as pd
-import json
-import requests
-from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from collections import Counter
@@ -44,10 +41,6 @@ st.markdown("""
         margin-bottom: 1rem;
         transition: transform 0.3s;
     }
-    .movie-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-    }
     .character-badge {
         background-color: #4a90e2;
         color: white;
@@ -70,23 +63,61 @@ st.markdown("""
         color: #f39c12;
         font-weight: bold;
     }
-    .highlight {
-        background-color: #fff3cd;
-        padding: 2px 5px;
-        border-radius: 3px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# 初始化会话状态
-if 'search_history' not in st.session_state:
-    st.session_state.search_history = []
-if 'favorite_quotes' not in st.session_state:
-    st.session_state.favorite_quotes = []
+def load_movie_quotes():
+    """加载电影台词数据"""
+    # 创建示例数据
+    data = {
+        'movie_title': ['The Godfather', 'The Dark Knight', 'Forrest Gump', 'Scarface', 'Titanic',
+                       'The Shawshank Redemption', 'Pulp Fiction', 'Star Wars', 'The Matrix', 'Inception'],
+        'character': ['Michael Corleone', 'Joker', 'Forrest Gump', 'Tony Montana', 'Jack Dawson',
+                     'Andy Dufresne', 'Jules Winnfield', 'Darth Vader', 'Neo', 'Dom Cobb'],
+        'quote': [
+            "I'm going to make him an offer he can't refuse.",
+            "Why so serious?",
+            "Life is like a box of chocolates. You never know what you're gonna get.",
+            "Say hello to my little friend!",
+            "I'm the king of the world!",
+            "Get busy living, or get busy dying.",
+            "Say 'what' again! I dare you, I double dare you!",
+            "I am your father.",
+            "I know kung fu.",
+            "You mustn't be afraid to dream a little bigger, darling."
+        ],
+        'year': [1972, 2008, 1994, 1983, 1997, 1994, 1994, 1980, 1999, 2010],
+        'sentiment': ['neutral', 'negative', 'positive', 'negative', 'positive', 
+                     'positive', 'negative', 'negative', 'neutral', 'positive'],
+        'scene_description': [
+            'Business negotiation scene',
+            'Hospital scene with Harvey Dent',
+            'Bench conversation',
+            'Final showdown',
+            'Ship bow scene',
+            'Prison escape scene',
+            'Diner scene',
+            'Lightsaber battle scene',
+            'Training program scene',
+            'Dream within a dream scene'
+        ],
+        'tags': ['mafia,power,negotiation', 'chaos,violence,philosophy', 'life,wisdom,innocence', 
+                'violence,drugs,power', 'love,freedom,ocean', 'hope,perseverance,freedom',
+                'violence,humor,threat', 'family,reveal,drama', 'action,learning,technology',
+                'dreams,ambition,reality']
+    }
+    
+    return pd.DataFrame(data)
 
 def main():
     # 应用标题
     st.markdown('<div class="main-header">🎬 Movie Quote Finder & Analyzer</div>', unsafe_allow_html=True)
+    
+    # 初始化会话状态
+    if 'favorite_quotes' not in st.session_state:
+        st.session_state.favorite_quotes = []
+    if 'selected_search' not in st.session_state:
+        st.session_state.selected_search = ""
     
     # 创建标签页
     tab1, tab2, tab3, tab4 = st.tabs(["🔍 Search Quotes", "📊 Analysis", "⭐ Favorites", "ℹ️ About"])
@@ -111,10 +142,19 @@ def display_search_tab():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        search_query = st.text_input(
+        # 使用会话状态来存储搜索输入
+        if 'search_input' not in st.session_state:
+            st.session_state.search_input = ""
+        
+        # 搜索框 - 使用回调函数更新会话状态
+        def update_search():
+            st.session_state.search_input = st.session_state.search_input_widget
+        
+        search_input = st.text_input(
             "Search for quotes, movies, or characters:",
             placeholder="e.g., 'You talking to me?' or 'The Godfather' or 'Tony Montana'",
-            key="search_input"
+            key="search_input_widget",
+            on_change=update_search
         )
     
     with col2:
@@ -123,29 +163,6 @@ def display_search_tab():
             ["All Fields", "Quotes Only", "Movie Titles", "Characters"],
             key="search_type"
         )
-    
-    # 高级筛选
-    with st.expander("🔧 Advanced Filters"):
-        filter_col1, filter_col2, filter_col3 = st.columns(3)
-        
-        with filter_col1:
-            year_from = st.number_input("From Year", min_value=1900, max_value=2024, value=1950)
-        
-        with filter_col2:
-            year_to = st.number_input("To Year", min_value=1900, max_value=2024, value=2024)
-        
-        with filter_col3:
-            sentiment_filter = st.selectbox(
-                "Sentiment:",
-                ["All", "Positive", "Negative", "Neutral"]
-            )
-    
-    # 搜索按钮
-    if st.button("🔍 Search Quotes", type="primary", use_container_width=True):
-        if search_query:
-            search_quotes(search_query, search_type, year_from, year_to, sentiment_filter)
-        else:
-            st.info("Please enter a search query to find movie quotes.")
     
     # 热门搜索建议
     st.markdown("### Popular Searches:")
@@ -157,18 +174,40 @@ def display_search_tab():
     
     for idx, search in enumerate(popular_searches):
         with popular_cols[idx]:
-            if st.button(search, use_container_width=True):
+            # 使用自定义回调函数处理按钮点击
+            if st.button(search, use_container_width=True, key=f"pop_search_{idx}"):
                 st.session_state.search_input = search
-                st.rerun()
+                st.rerun()  # 重新运行应用以反映搜索输入的变化
+    
+    # 高级筛选
+    with st.expander("🔧 Advanced Filters"):
+        filter_col1, filter_col2, filter_col3 = st.columns(3)
+        
+        with filter_col1:
+            year_from = st.number_input("From Year", min_value=1900, max_value=2024, value=1950, key="year_from")
+        
+        with filter_col2:
+            year_to = st.number_input("To Year", min_value=1900, max_value=2024, value=2024, key="year_to")
+        
+        with filter_col3:
+            sentiment_filter = st.selectbox(
+                "Sentiment:",
+                ["All", "Positive", "Negative", "Neutral"],
+                key="sentiment_filter"
+            )
+    
+    # 执行搜索
+    search_query = st.session_state.get('search_input', '')
+    
+    if search_query:
+        search_quotes(search_query, search_type, year_from, year_to, sentiment_filter)
+    else:
+        st.info("👆 Enter a search query above or click a popular search to find movie quotes.")
 
 def search_quotes(query, search_type, year_from, year_to, sentiment):
     """搜索电影台词"""
     # 加载数据
     quotes_df = load_movie_quotes()
-    
-    if quotes_df.empty:
-        st.warning("No movie quotes database found. Please check data files.")
-        return
     
     # 根据搜索类型过滤
     filtered_df = quotes_df.copy()
@@ -181,36 +220,30 @@ def search_quotes(query, search_type, year_from, year_to, sentiment):
     
     # 情感过滤
     if sentiment != "All":
-        filtered_df = filtered_df[filtered_df['sentiment'] == sentiment.lower()]
+        sentiment_map = {"Positive": "positive", "Negative": "negative", "Neutral": "neutral"}
+        filtered_df = filtered_df[filtered_df['sentiment'] == sentiment_map[sentiment]]
     
     # 关键词搜索
     if query:
+        query_lower = query.lower()
         if search_type == "All Fields":
             mask = (
-                filtered_df['quote'].str.contains(query, case=False, na=False) |
-                filtered_df['movie_title'].str.contains(query, case=False, na=False) |
-                filtered_df['character'].str.contains(query, case=False, na=False)
+                filtered_df['quote'].str.lower().str.contains(query_lower, na=False) |
+                filtered_df['movie_title'].str.lower().str.contains(query_lower, na=False) |
+                filtered_df['character'].str.lower().str.contains(query_lower, na=False)
             )
         elif search_type == "Quotes Only":
-            mask = filtered_df['quote'].str.contains(query, case=False, na=False)
+            mask = filtered_df['quote'].str.lower().str.contains(query_lower, na=False)
         elif search_type == "Movie Titles":
-            mask = filtered_df['movie_title'].str.contains(query, case=False, na=False)
+            mask = filtered_df['movie_title'].str.lower().str.contains(query_lower, na=False)
         elif search_type == "Characters":
-            mask = filtered_df['character'].str.contains(query, case=False, na=False)
+            mask = filtered_df['character'].str.lower().str.contains(query_lower, na=False)
         
         filtered_df = filtered_df[mask]
     
     # 显示结果
     if len(filtered_df) > 0:
         st.success(f"Found {len(filtered_df)} quotes matching your search")
-        
-        # 添加到搜索历史
-        st.session_state.search_history.append({
-            "query": query,
-            "type": search_type,
-            "results": len(filtered_df),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
         
         # 显示结果
         for idx, row in filtered_df.iterrows():
@@ -220,6 +253,9 @@ def search_quotes(query, search_type, year_from, year_to, sentiment):
 
 def display_quote_card(quote_data, index):
     """显示单个台词卡片"""
+    # 获取情感对应的CSS类
+    sentiment_class = f"sentiment-{quote_data['sentiment']}"
+    
     with st.container():
         st.markdown(f"""
         <div class="quote-card">
@@ -235,29 +271,49 @@ def display_quote_card(quote_data, index):
             <div style="margin-top: 1rem; color: #555;">
                 <strong>🎬 Movie:</strong> {quote_data['movie_title']} ({quote_data['year']})<br>
                 <strong>🎭 Scene:</strong> {quote_data['scene_description']}<br>
-                <strong>📊 Sentiment:</strong> <span class="sentiment-{quote_data['sentiment']}">{quote_data['sentiment'].title()}</span>
+                <strong>📊 Sentiment:</strong> <span class="{sentiment_class}">{quote_data['sentiment'].title()}</span>
             </div>
             
             <div style="margin-top: 1rem;">
-                <strong>🏷️ Tags:</strong> {', '.join(quote_data['tags'].split(','))}
+                <strong>🏷️ Tags:</strong> {quote_data['tags'].replace(',', ', ')}
             </div>
         </div>
         """, unsafe_allow_html=True)
         
         # 操作按钮
-        col1, col2, col3 = st.columns([1, 1, 2])
+        col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("⭐ Favorite", key=f"fav_{index}"):
-                add_to_favorites(quote_data)
-                st.success("Added to favorites!")
+            # 收藏按钮
+            if st.button("⭐ Add to Favorites", key=f"fav_{index}", use_container_width=True):
+                # 检查是否已经收藏
+                quote_exists = False
+                for fav in st.session_state.favorite_quotes:
+                    if fav['quote'] == quote_data['quote']:
+                        quote_exists = True
+                        break
+                
+                if not quote_exists:
+                    st.session_state.favorite_quotes.append({
+                        'movie_title': quote_data['movie_title'],
+                        'character': quote_data['character'],
+                        'quote': quote_data['quote'],
+                        'year': quote_data['year'],
+                        'sentiment': quote_data['sentiment']
+                    })
+                    st.success("✓ Added to favorites!")
+                    st.rerun()
+                else:
+                    st.info("Already in favorites")
         
         with col2:
-            if st.button("🔍 Context", key=f"context_{index}"):
-                show_quote_context(quote_data)
-        
-        with col3:
-            st.write(f"**Length:** {len(quote_data['quote'])} characters")
+            # 显示上下文信息
+            if st.button("📖 Show Context", key=f"context_{index}", use_container_width=True):
+                st.info(f"**Movie:** {quote_data['movie_title']} ({quote_data['year']})  \n"
+                       f"**Character:** {quote_data['character']}  \n"
+                       f"**Scene:** {quote_data['scene_description']}  \n"
+                       f"**Sentiment:** {quote_data['sentiment'].title()}  \n"
+                       f"**Tags:** {quote_data['tags'].replace(',', ', ')}")
         
         st.markdown("---")
 
@@ -268,14 +324,15 @@ def display_analysis_tab():
     # 加载数据
     quotes_df = load_movie_quotes()
     
-    if quotes_df.empty:
+    if len(quotes_df) == 0:
         st.warning("No data available for analysis.")
         return
     
     # 分析选项
     analysis_type = st.selectbox(
         "Select Analysis Type:",
-        ["Sentiment Distribution", "Most Quoted Characters", "Quotes by Year", "Word Cloud Analysis"]
+        ["Sentiment Distribution", "Most Quoted Characters", "Quotes by Year", "Word Frequency"],
+        key="analysis_type"
     )
     
     if analysis_type == "Sentiment Distribution":
@@ -286,7 +343,7 @@ def display_analysis_tab():
             values=sentiment_counts.values,
             names=sentiment_counts.index,
             title="Sentiment Distribution of Movie Quotes",
-            color_discrete_sequence=px.colors.qualitative.Set3
+            color_discrete_sequence=['#2ecc71', '#e74c3c', '#f39c12']
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -300,7 +357,8 @@ def display_analysis_tab():
             y=top_characters.index,
             orientation='h',
             title="Top 10 Most Quoted Characters",
-            labels={'x': 'Number of Quotes', 'y': 'Character'}
+            labels={'x': 'Number of Quotes', 'y': 'Character'},
+            color=top_characters.values
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -319,16 +377,19 @@ def display_analysis_tab():
         
         st.plotly_chart(fig, use_container_width=True)
     
-    elif analysis_type == "Word Cloud Analysis":
+    elif analysis_type == "Word Frequency":
         # 词频分析
         all_quotes = ' '.join(quotes_df['quote'].tolist())
         words = re.findall(r'\b\w+\b', all_quotes.lower())
         
         # 移除停用词
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being'}
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 
+                     'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 
+                     'been', 'being', 'i', 'you', 'he', 'she', 'it', 'we', 'they'}
+        
         filtered_words = [word for word in words if word not in stop_words and len(word) > 2]
         
-        word_freq = Counter(filtered_words).most_common(20)
+        word_freq = Counter(filtered_words).most_common(15)
         
         words_df = pd.DataFrame(word_freq, columns=['Word', 'Frequency'])
         
@@ -337,7 +398,7 @@ def display_analysis_tab():
             x='Frequency',
             y='Word',
             orientation='h',
-            title="Top 20 Most Common Words in Movie Quotes",
+            title="Top 15 Most Common Words in Movie Quotes",
             color='Frequency'
         )
         
@@ -358,7 +419,8 @@ def display_analysis_tab():
         st.metric("Unique Characters", quotes_df['character'].nunique())
     
     with col4:
-        st.metric("Average Quote Length", f"{quotes_df['quote'].str.len().mean():.0f} chars")
+        avg_len = quotes_df['quote'].str.len().mean()
+        st.metric("Average Quote Length", f"{avg_len:.0f} chars")
 
 def display_favorites_tab():
     """显示收藏标签页"""
@@ -371,21 +433,36 @@ def display_favorites_tab():
     # 显示收藏的台词
     for idx, quote in enumerate(st.session_state.favorite_quotes):
         with st.container():
+            sentiment_class = f"sentiment-{quote['sentiment']}"
+            
             st.markdown(f"""
             <div class="movie-card">
-                <div style="display: flex; justify-content: space-between;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <h4 style="margin: 0;">"{quote['quote'][:100]}..."</h4>
+                        <h4 style="margin: 0; color: #2c3e50;">"{quote['quote']}"</h4>
                         <p style="margin: 0.5rem 0; color: #666;">
-                            <strong>{quote['character']}</strong> in <em>{quote['movie_title']}</em>
+                            <strong>{quote['character']}</strong> in <em>{quote['movie_title']}</em> ({quote['year']})
+                        </p>
+                        <p style="margin: 0; color: #888;">
+                            Sentiment: <span class="{sentiment_class}">{quote['sentiment'].title()}</span>
                         </p>
                     </div>
                     <div>
-                        {st.button("🗑️", key=f"remove_{idx}", help="Remove from favorites")}
-                    </div>
-                </div>
-            </div>
             """, unsafe_allow_html=True)
+            
+            # 移除按钮
+            if st.button("🗑️ Remove", key=f"remove_{idx}"):
+                st.session_state.favorite_quotes.pop(idx)
+                st.success("Removed from favorites!")
+                st.rerun()
+            
+            st.markdown("</div></div>", unsafe_allow_html=True)
+    
+    # 清空所有收藏按钮
+    if st.button("Clear All Favorites", type="secondary"):
+        st.session_state.favorite_quotes = []
+        st.success("All favorites cleared!")
+        st.rerun()
 
 def display_about_tab():
     """显示关于标签页"""
@@ -396,7 +473,7 @@ def display_about_tab():
     
     Movie Quote Finder is an interactive web application that allows you to:
     
-    - 🔍 **Search** through thousands of famous movie quotes
+    - 🔍 **Search** through famous movie quotes
     - 🎭 **Analyze** quotes by sentiment, character, and year
     - 📊 **Visualize** trends and patterns in cinematic dialogue
     - ⭐ **Save** your favorite quotes for later reference
@@ -415,14 +492,6 @@ def display_about_tab():
     - **Features**: Real-time search, sentiment analysis, data visualization
     - **Deployment**: Ready for Streamlit Cloud deployment
     
-    ### 📊 Database Information
-    
-    The application includes quotes from:
-    - Classic films (1950s-1990s)
-    - Modern cinema (2000s-present)
-    - Various genres and languages
-    - Iconic characters and memorable scenes
-    
     ### 🎓 Educational Purpose
     
     This project was developed as part of the "Arts and Advanced Big Data" course, 
@@ -436,51 +505,7 @@ def display_about_tab():
     
     # 版本信息
     st.markdown("---")
-    st.markdown("**Version:** 1.0.0 | **Last Updated:** November 2024")
-
-def load_movie_quotes():
-    """加载电影台词数据"""
-    try:
-        # 示例数据 - 实际应用中应该从文件加载
-        sample_data = {
-            'movie_title': ['The Godfather', 'The Dark Knight', 'Forrest Gump', 'Scarface', 'Titanic'],
-            'character': ['Michael Corleone', 'Joker', 'Forrest Gump', 'Tony Montana', 'Jack Dawson'],
-            'quote': [
-                "I'm going to make him an offer he can't refuse.",
-                "Why so serious?",
-                "Life is like a box of chocolates. You never know what you're gonna get.",
-                "Say hello to my little friend!",
-                "I'm the king of the world!"
-            ],
-            'year': [1972, 2008, 1994, 1983, 1997],
-            'sentiment': ['neutral', 'negative', 'positive', 'negative', 'positive'],
-            'scene_description': [
-                'Business negotiation scene',
-                'Hospital scene with Harvey Dent',
-                'Bench conversation',
-                'Final showdown',
-                'Ship bow scene'
-            ],
-            'tags': ['mafia,power,negotiation', 'chaos,violence,philosophy', 'life,wisdom,innocence', 'violence,drugs,power', 'love,freedom,ocean']
-        }
-        
-        return pd.DataFrame(sample_data)
-    
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return pd.DataFrame()
-
-def add_to_favorites(quote_data):
-    """添加台词到收藏"""
-    if quote_data not in st.session_state.favorite_quotes:
-        st.session_state.favorite_quotes.append(quote_data)
-
-def show_quote_context(quote_data):
-    """显示台词上下文"""
-    st.info(f"**Context for:** {quote_data['movie_title']}")
-    st.write(f"**Character:** {quote_data['character']}")
-    st.write(f"**Scene:** {quote_data['scene_description']}")
-    st.write(f"**Full Quote:** {quote_data['quote']}")
+    st.markdown("**Version:** 1.0.0 | **Last Updated:** December 2024")
 
 if __name__ == "__main__":
     main()
