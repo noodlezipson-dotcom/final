@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 from collections import Counter
 import re
 
@@ -21,9 +20,6 @@ st.markdown("""
         color: #1f77b4;
         text-align: center;
         margin-bottom: 2rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
     }
     .quote-card {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -32,14 +28,6 @@ st.markdown("""
         border-left: 5px solid #1f77b4;
         margin-bottom: 1rem;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .movie-card {
-        background: white;
-        padding: 1.2rem;
-        border-radius: 10px;
-        border: 1px solid #ddd;
-        margin-bottom: 1rem;
-        transition: transform 0.3s;
     }
     .character-badge {
         background-color: #4a90e2;
@@ -68,7 +56,6 @@ st.markdown("""
 
 def load_movie_quotes():
     """加载电影台词数据"""
-    # 创建示例数据
     data = {
         'movie_title': ['The Godfather', 'The Dark Knight', 'Forrest Gump', 'Scarface', 'Titanic',
                        'The Shawshank Redemption', 'Pulp Fiction', 'Star Wars', 'The Matrix', 'Inception'],
@@ -116,8 +103,6 @@ def main():
     # 初始化会话状态
     if 'favorite_quotes' not in st.session_state:
         st.session_state.favorite_quotes = []
-    if 'selected_search' not in st.session_state:
-        st.session_state.selected_search = ""
     
     # 创建标签页
     tab1, tab2, tab3, tab4 = st.tabs(["🔍 Search Quotes", "📊 Analysis", "⭐ Favorites", "ℹ️ About"])
@@ -142,19 +127,11 @@ def display_search_tab():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # 使用会话状态来存储搜索输入
-        if 'search_input' not in st.session_state:
-            st.session_state.search_input = ""
-        
-        # 搜索框 - 使用回调函数更新会话状态
-        def update_search():
-            st.session_state.search_input = st.session_state.search_input_widget
-        
+        # 搜索框
         search_input = st.text_input(
             "Search for quotes, movies, or characters:",
             placeholder="e.g., 'You talking to me?' or 'The Godfather' or 'Tony Montana'",
-            key="search_input_widget",
-            on_change=update_search
+            key="search_input"
         )
     
     with col2:
@@ -174,10 +151,9 @@ def display_search_tab():
     
     for idx, search in enumerate(popular_searches):
         with popular_cols[idx]:
-            # 使用自定义回调函数处理按钮点击
             if st.button(search, use_container_width=True, key=f"pop_search_{idx}"):
                 st.session_state.search_input = search
-                st.rerun()  # 重新运行应用以反映搜索输入的变化
+                st.rerun()
     
     # 高级筛选
     with st.expander("🔧 Advanced Filters"):
@@ -196,13 +172,13 @@ def display_search_tab():
                 key="sentiment_filter"
             )
     
-    # 执行搜索
-    search_query = st.session_state.get('search_input', '')
-    
-    if search_query:
-        search_quotes(search_query, search_type, year_from, year_to, sentiment_filter)
-    else:
-        st.info("👆 Enter a search query above or click a popular search to find movie quotes.")
+    # 搜索按钮
+    if st.button("🔍 Search Quotes", type="primary", use_container_width=True):
+        search_query = st.session_state.get('search_input', '')
+        if search_query:
+            search_quotes(search_query, search_type, year_from, year_to, sentiment_filter)
+        else:
+            st.info("Please enter a search query first.")
 
 def search_quotes(query, search_type, year_from, year_to, sentiment):
     """搜索电影台词"""
@@ -253,69 +229,69 @@ def search_quotes(query, search_type, year_from, year_to, sentiment):
 
 def display_quote_card(quote_data, index):
     """显示单个台词卡片"""
-    # 获取情感对应的CSS类
-    sentiment_class = f"sentiment-{quote_data['sentiment']}"
-    
-    with st.container():
-        st.markdown(f"""
-        <div class="quote-card">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div>
-                    <h4 style="margin: 0; color: #2c3e50;">"{quote_data['quote']}"</h4>
-                </div>
-                <div>
-                    <span class="character-badge">{quote_data['character']}</span>
-                </div>
+    # 创建HTML字符串 - 修复版本
+    html_content = f'''
+    <div class="quote-card">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <h4 style="margin: 0; color: #2c3e50;">"{quote_data['quote']}"</h4>
             </div>
-            
-            <div style="margin-top: 1rem; color: #555;">
-                <strong>🎬 Movie:</strong> {quote_data['movie_title']} ({quote_data['year']})<br>
-                <strong>🎭 Scene:</strong> {quote_data['scene_description']}<br>
-                <strong>📊 Sentiment:</strong> <span class="{sentiment_class}">{quote_data['sentiment'].title()}</span>
-            </div>
-            
-            <div style="margin-top: 1rem;">
-                <strong>🏷️ Tags:</strong> {quote_data['tags'].replace(',', ', ')}
+            <div>
+                <span class="character-badge">{quote_data['character']}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
         
-        # 操作按钮
-        col1, col2 = st.columns(2)
+        <div style="margin-top: 1rem; color: #555;">
+            <strong>🎬 Movie:</strong> {quote_data['movie_title']} ({quote_data['year']})<br>
+            <strong>🎭 Scene:</strong> {quote_data['scene_description']}<br>
+            <strong>📊 Sentiment:</strong> <span class="sentiment-{quote_data['sentiment']}">{quote_data['sentiment'].title()}</span>
+        </div>
         
-        with col1:
-            # 收藏按钮
-            if st.button("⭐ Add to Favorites", key=f"fav_{index}", use_container_width=True):
-                # 检查是否已经收藏
-                quote_exists = False
-                for fav in st.session_state.favorite_quotes:
-                    if fav['quote'] == quote_data['quote']:
-                        quote_exists = True
-                        break
-                
-                if not quote_exists:
-                    st.session_state.favorite_quotes.append({
-                        'movie_title': quote_data['movie_title'],
-                        'character': quote_data['character'],
-                        'quote': quote_data['quote'],
-                        'year': quote_data['year'],
-                        'sentiment': quote_data['sentiment']
-                    })
-                    st.success("✓ Added to favorites!")
-                    st.rerun()
-                else:
-                    st.info("Already in favorites")
-        
-        with col2:
-            # 显示上下文信息
-            if st.button("📖 Show Context", key=f"context_{index}", use_container_width=True):
-                st.info(f"**Movie:** {quote_data['movie_title']} ({quote_data['year']})  \n"
-                       f"**Character:** {quote_data['character']}  \n"
-                       f"**Scene:** {quote_data['scene_description']}  \n"
-                       f"**Sentiment:** {quote_data['sentiment'].title()}  \n"
-                       f"**Tags:** {quote_data['tags'].replace(',', ', ')}")
-        
-        st.markdown("---")
+        <div style="margin-top: 1rem;">
+            <strong>🏷️ Tags:</strong> {quote_data['tags'].replace(",", ", ")}
+        </div>
+    </div>
+    '''
+    
+    # 显示HTML内容
+    st.markdown(html_content, unsafe_allow_html=True)
+    
+    # 操作按钮
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # 收藏按钮
+        if st.button("⭐ Add to Favorites", key=f"fav_{index}", use_container_width=True):
+            # 检查是否已经收藏
+            quote_exists = False
+            for fav in st.session_state.favorite_quotes:
+                if fav['quote'] == quote_data['quote']:
+                    quote_exists = True
+                    break
+            
+            if not quote_exists:
+                st.session_state.favorite_quotes.append({
+                    'movie_title': quote_data['movie_title'],
+                    'character': quote_data['character'],
+                    'quote': quote_data['quote'],
+                    'year': quote_data['year'],
+                    'sentiment': quote_data['sentiment']
+                })
+                st.success("✓ Added to favorites!")
+                st.rerun()
+            else:
+                st.info("Already in favorites")
+    
+    with col2:
+        # 显示上下文信息
+        if st.button("📖 Show Context", key=f"context_{index}", use_container_width=True):
+            st.info(f"**Movie:** {quote_data['movie_title']} ({quote_data['year']})  \n"
+                   f"**Character:** {quote_data['character']}  \n"
+                   f"**Scene:** {quote_data['scene_description']}  \n"
+                   f"**Sentiment:** {quote_data['sentiment'].title()}  \n"
+                   f"**Tags:** {quote_data['tags'].replace(',', ', ')}")
+    
+    st.markdown("---")
 
 def display_analysis_tab():
     """显示分析标签页"""
@@ -432,31 +408,35 @@ def display_favorites_tab():
     
     # 显示收藏的台词
     for idx, quote in enumerate(st.session_state.favorite_quotes):
-        with st.container():
-            sentiment_class = f"sentiment-{quote['sentiment']}"
-            
-            st.markdown(f"""
-            <div class="movie-card">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h4 style="margin: 0; color: #2c3e50;">"{quote['quote']}"</h4>
-                        <p style="margin: 0.5rem 0; color: #666;">
-                            <strong>{quote['character']}</strong> in <em>{quote['movie_title']}</em> ({quote['year']})
-                        </p>
-                        <p style="margin: 0; color: #888;">
-                            Sentiment: <span class="{sentiment_class}">{quote['sentiment'].title()}</span>
-                        </p>
-                    </div>
-                    <div>
-            """, unsafe_allow_html=True)
-            
-            # 移除按钮
-            if st.button("🗑️ Remove", key=f"remove_{idx}"):
-                st.session_state.favorite_quotes.pop(idx)
-                st.success("Removed from favorites!")
-                st.rerun()
-            
-            st.markdown("</div></div>", unsafe_allow_html=True)
+        # 创建HTML内容
+        sentiment_class = f"sentiment-{quote['sentiment']}"
+        html_content = f'''
+        <div class="quote-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0; color: #2c3e50;">"{quote['quote']}"</h4>
+                    <p style="margin: 0.5rem 0; color: #666;">
+                        <strong>{quote['character']}</strong> in <em>{quote['movie_title']}</em> ({quote['year']})
+                    </p>
+                    <p style="margin: 0; color: #888;">
+                        Sentiment: <span class="{sentiment_class}">{quote['sentiment'].title()}</span>
+                    </p>
+                </div>
+                <div>
+                    <button style="background-color: #ff6b6b; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;"
+                            onclick="window.location.href='?remove_favorite={idx}'">🗑️ Remove</button>
+                </div>
+            </div>
+        </div>
+        '''
+        
+        st.markdown(html_content, unsafe_allow_html=True)
+        
+        # 检查URL参数来删除收藏
+        if st.query_params.get("remove_favorite") == str(idx):
+            st.session_state.favorite_quotes.pop(idx)
+            st.success("Removed from favorites!")
+            st.rerun()
     
     # 清空所有收藏按钮
     if st.button("Clear All Favorites", type="secondary"):
