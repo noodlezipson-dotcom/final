@@ -1,19 +1,38 @@
-# 🎈 Blank app template
+# Movie Quote Finder & Analyzer 🎬
 
-A simple Streamlit app template for you to modify!
+An interactive web application for searching, analyzing, and visualizing famous movie quotes from cinema history.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+## Features
 
-### How to run it on your own machine
+### 🔍 Advanced Search
+- Search by quote content, movie title, or character name
+- Multiple search modes (All Fields, Quotes Only, Movie Titles, Characters)
+- Advanced filtering by year range and sentiment
+- Popular search suggestions
 
-1. Install the requirements
+### 📊 Data Analysis
+- Sentiment distribution visualization (Positive/Negative/Neutral)
+- Top quoted characters ranking
+- Quotes trend analysis by year
+- Word frequency analysis and word clouds
+- Comprehensive database statistics
 
-   ```
-   $ pip install -r requirements.txt
-   ```
+### ⭐ Personal Collection
+- Save favorite quotes to your collection
+- Easy management of saved quotes
+- Quick access to frequently referenced dialogue
 
-2. Run the app
+### 🎨 Interactive Interface
+- Modern, responsive design with gradient accents
+- Quote cards with detailed metadata
+- Character badges and sentiment indicators
+- Smooth animations and hover effects
 
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+## Installation & Usage
+
+### Local Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/your-username/movie-quote-finder.git
+cd movie-quote-finder
